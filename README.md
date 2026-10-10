@@ -1,16 +1,21 @@
 # BFF Web
 
-Adaptador del canal Web. Recibe consultas autenticadas, llama a Account Service
-y devuelve el contrato del canal: datos de cuenta, saldos y movimientos.
+Expone información completa, gestión de perfiles y cuentas, importación revisada y depósitos, transferencias y pagos para el canal Web. Protege sus endpoints con JWT, audiencia y scopes.
 
-## Endpoints actuales
+## Participación en el proyecto
 
-| Método / ruta | Permiso |
+| Aspecto | Función |
 |---|---|
-| GET /api/web/cuentas/{cuentaId} | web.read |
-| GET /api/web/transacciones/{id} | web.read |
-| GET /actuator/info | web.info |
-| GET /actuator/health | Público, sin detalles internos |
+| Entrada | HTTPS del cliente Web |
+| Salida | Contratos Web y llamadas a servicios de dominio |
+| Ejecución | HTTPS localhost:8081 |
 
+## Flujo completo
 
-El perfil cloud importa config-repo/bff-web-cloud.properties.
+Los CSV se procesan localmente con Spring Batch y sus resultados se guardan en MySQL. Los datos históricos permanecen disponibles; las asociaciones revisadas permiten crear cuentas modernas con trazabilidad al archivo de origen.
+
+El cliente obtiene un JWT en Auth Server y accede por HTTPS a su BFF (Web, Móvil o Cajero). El BFF valida el token y sus permisos, adapta la respuesta y descubre los servicios mediante Eureka. Customer administra perfiles; Account administra cuentas, saldos y movimientos; Payment administra órdenes de pago.
+
+Para una operación monetaria, el BFF envía la orden a Payment, que guarda la orden y su outbox. Kafka en AWS transporta el comando hasta Account. Account aplica los movimientos en una transacción de MySQL y publica el resultado mediante su outbox. Payment consume el resultado y la consulta del BFF informa APLICADO o RECHAZADO. La clave de idempotencia evita repetir el efecto de una misma operación. El flujo de solicitudes de estado de cuenta se publica directamente desde BFF Web hacia Kafka y lo consume Account.
+
+Config Server centraliza propiedades y Resilience4j limita los fallos en llamadas HTTP. Docker Compose ejecuta los servicios locales; MySQL y el batch permanecen en el PC. AWS aloja únicamente Kafka, en modo KRaft.

@@ -21,6 +21,12 @@ public class AccountServiceClient {
                 .onStatus(status -> status.value() == 404, (req, res) -> { throw new ResourceNotFoundException("No existe la cuenta " + id); })
                 .body(AccountServiceResponse.class));
     }
+    public java.util.Map<String,Object> findSolicitud(java.util.UUID id, String clientId) {
+        return resilience.execute(() -> client.get().uri(builder -> builder.path("/internal/solicitudes-estado/{id}")
+                .queryParam("cliente", clientId).build(id)).retrieve()
+                .onStatus(status -> status.value() == 404, (req, res) -> { throw new ResourceNotFoundException("Solicitud aun no persistida o no disponible"); })
+                .body(new org.springframework.core.ParameterizedTypeReference<java.util.Map<String,Object>>() {}));
+    }
     public TransactionServiceResponse findTransaction(Integer id) {
         return resilience.execute(() -> client.get().uri("/internal/transactions/{id}", id).retrieve()
                 .onStatus(status -> status.value() == 404, (req, res) -> { throw new ResourceNotFoundException("No existe la transacción " + id); })

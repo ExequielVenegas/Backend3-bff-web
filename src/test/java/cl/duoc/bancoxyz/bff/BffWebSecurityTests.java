@@ -53,6 +53,32 @@ class BffWebSecurityTests {
     @AfterAll static void closeServer() { JWKS.stop(0); }
     @Autowired MockMvc mvc;
     @MockitoBean AccountServiceClient client;
+    @MockitoBean cl.duoc.bancoxyz.bff.common.client.CustomerServiceClient customers;
+    @MockitoBean cl.duoc.bancoxyz.bff.common.client.PaymentServiceClient payments;
+
+    @Test void paymentReadScopeForwardsTokenToDomain() throws Exception {
+        String bearer=token(SIGNING_KEY,"http://localhost:9000","bff-web","web.payments.read",Instant.now().plusSeconds(300));
+        when(payments.list(0,20,bearer)).thenReturn(org.springframework.http.ResponseEntity.ok("[]"));
+        mvc.perform(get("/api/web/pagos").header("Authorization","Bearer "+bearer)).andExpect(status().isOk());
+        verify(payments).list(0,20,bearer);
+    }
+    @Test void legacyReadDoesNotGrantPaymentAccess() throws Exception {
+        String bearer=token(SIGNING_KEY,"http://localhost:9000","bff-web","web.read",Instant.now().plusSeconds(300));
+        mvc.perform(get("/api/web/pagos").header("Authorization","Bearer "+bearer)).andExpect(status().isForbidden());
+        verifyNoInteractions(payments);
+    }
+
+    @Test void forwardsCustomerTokenOnlyWithSpecificScope() throws Exception {
+        String bearer=token(SIGNING_KEY,"http://localhost:9000","bff-web","web.customers.read",Instant.now().plusSeconds(300));
+        when(customers.list(0,20,bearer)).thenReturn(org.springframework.http.ResponseEntity.ok("[]"));
+        mvc.perform(get("/api/web/clientes").header("Authorization","Bearer "+bearer)).andExpect(status().isOk());
+        verify(customers).list(0,20,bearer);
+    }
+    @Test void accountReadScopeDoesNotGrantCustomerAccess() throws Exception {
+        String bearer=token(SIGNING_KEY,"http://localhost:9000","bff-web","web.read",Instant.now().plusSeconds(300));
+        mvc.perform(get("/api/web/clientes").header("Authorization","Bearer "+bearer)).andExpect(status().isForbidden());
+        verifyNoInteractions(customers);
+    }
 
     @Test void rejectsMissingTokenBeforeCallingBackend() throws Exception {
         mvc.perform(get("/api/web/cuentas/1")).andExpect(status().isUnauthorized());
